@@ -6,16 +6,11 @@ export interface StemPlayerProps {}
 const StemPlayer = (props: StemPlayerProps) => {
   const audioEl = useRef(null)
   const volumeEl = useRef(null)
-
-  // const player = new Tone.Player(
-  //   "https://tonejs.github.io/audio/berklee/gong_1.mp3"
-  // ).toDestination()
-  // Tone.loaded().then(() => {
-  //   player.start()
-  // })
+  const [players, setPlayers] = useState<any[]>([])
 
   const audioSources = [
     "https://cdn.sanity.io/files/kljwxr6f/production/be1e78ae85846e61fe807c16e127b8cfe4005e69.wav",
+    "https://tonejs.github.io/audio/berklee/gong_1.mp3",
   ]
 
   const toneStart = async () => {
@@ -23,31 +18,46 @@ const StemPlayer = (props: StemPlayerProps) => {
     console.log("audio is ready")
   }
 
+  console.log("user", players)
+
+  useEffect(() => {
+    setPlayers(initializeTrackPlayers(audioSources))
+  }, [])
+
+  const initializeTrackPlayers = (sources: string[]) => {
+    const players: any[] = []
+    for (let i = 0; i < audioSources.length; i++) {
+      players.push(new Tone.Player(sources[i]))
+    }
+    return players
+  }
+
+  console.log(initializeTrackPlayers(audioSources), "init")
+
   const channel = new Tone.Channel(-12, -0.5)
 
   const player = new Tone.Player(
     "https://tonejs.github.io/audio/berklee/gong_1.mp3"
   )
 
-  const player2 = new Tone.Player(
-    "https://cdn.sanity.io/files/kljwxr6f/production/be1e78ae85846e61fe807c16e127b8cfe4005e69.wav"
-  )
+  const player2 = new Tone.Player(audioSources[0]).toDestination()
 
-  player2.chain(channel, Tone.Destination)
-
-  const clickHandler = () => {
-    toneStart()
-
+  const clickHandler = async () => {
+    await toneStart()
+    players.forEach((player) => {
+      player.toDestination()
+    })
     Tone.loaded().then(() => {
-      player.start()
-      console.log(player2.volume.value)
-      player2.start()
+      players.forEach((player) => {
+        player.start()
+      })
     })
   }
 
   const stopHandler = () => {
-    player.stop()
-    player2.stop()
+    players.forEach((player) => {
+      player.stop()
+    })
   }
 
   const muteHandler = () => {
@@ -58,16 +68,6 @@ const StemPlayer = (props: StemPlayerProps) => {
     console.log(e.target.value, "vol")
     player2.volume.value = Number(e.target.value) * 100
   }
-
-  // useEffect(() => {
-  //   const player = new Tone.Player(
-  //     "https://cdn.sanity.io/files/kljwxr6f/production/be1e78ae85846e61fe807c16e127b8cfe4005e69.wav"
-  //   ).toDestination()
-  //   Tone.loaded().then(() => {
-  //     player.start()
-  //   })
-
-  // }, [])
 
   const renderAudioTracks = () => {
     return audioSources.map((el) => (
@@ -85,6 +85,7 @@ const StemPlayer = (props: StemPlayerProps) => {
     ))
   }
 
+  if (!players.length) return <div>Loading...</div>
   return (
     <>
       <p>Yo Yo yo yo</p>
