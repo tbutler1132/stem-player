@@ -1,132 +1,130 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useState } from "react"
 import * as Tone from "tone"
 
 export interface StemPlayerProps {}
 
 const StemPlayer = (props: StemPlayerProps) => {
-  const audioEl = useRef(null)
-  const volumeEl = useRef(null)
-  const [players, setPlayers] = useState<any[]>([])
-
   const audioSources = [
     "https://cdn.sanity.io/files/kljwxr6f/production/be1e78ae85846e61fe807c16e127b8cfe4005e69.wav",
     "https://tonejs.github.io/audio/berklee/gong_1.mp3",
   ]
 
-  const toneStart = async () => {
-    await Tone.start()
-    console.log("audio is ready")
-  }
-
-  console.log("user", players)
-
-  useEffect(() => {
-    setPlayers(initializeTrackPlayers(audioSources))
-  }, [])
-
-  const initializeTrackPlayers = (sources: string[]) => {
-    const players: any[] = []
-    for (let i = 0; i < audioSources.length; i++) {
-      players.push(new Tone.Player(sources[i]))
-    }
-    return players
-  }
-
-  console.log(initializeTrackPlayers(audioSources), "init")
-
-  const channel = new Tone.Channel(-12, -0.5)
-
-  const player = new Tone.Player(
-    "https://tonejs.github.io/audio/berklee/gong_1.mp3"
-  )
-
-  const player2 = new Tone.Player(audioSources[0]).toDestination()
-
-  const clickHandler = async () => {
-    await toneStart()
-    players.forEach((player) => {
-      player.toDestination()
-    })
-    Tone.loaded().then(() => {
-      players.forEach((player) => {
-        player.start()
-      })
-    })
-  }
-
-  const stopHandler = () => {
-    players.forEach((player) => {
-      player.stop()
-    })
-  }
-
-  const muteHandler = () => {
-    channel.mute = true
-  }
-
-  const volumeHandler = (e: any) => {
-    console.log(e.target.value, "vol")
-    player2.volume.value = Number(e.target.value) * 100
-  }
-
-  const renderAudioTracks = () => {
-    return audioSources.map((el) => (
-      <div key={el}>
-        <audio id="test" ref={audioEl} crossOrigin="anonymous" src={el}></audio>
-        <input
-          ref={volumeEl}
-          type="range"
-          id="volume"
-          min="-100"
-          max="0"
-          step=".1"
-        ></input>
-      </div>
-    ))
-  }
-
-  if (!players.length) return <div>Loading...</div>
   return (
     <>
       <p>Yo Yo yo yo</p>
-      <button
-        onClick={clickHandler}
-        // ref={playButtonEl}
-        // data-playing="false"
-        // role="switch"
-        // aria-checked="false"
-      >
-        <span>Play/Pause</span>
-      </button>
-      <button
-        onClick={stopHandler}
-        // ref={playButtonEl}
-        // data-playing="false"
-        // role="switch"
-        // aria-checked="false"
-      >
-        <span>STOP</span>
-      </button>
-      <button
-        onClick={muteHandler}
-        // ref={playButtonEl}
-        // data-playing="false"
-        // role="switch"
-        // aria-checked="false"
-      >
-        <span>mute</span>
-      </button>
-      <input
-        onChange={volumeHandler}
-        type="range"
-        id="volume"
-        min="-1"
-        max="0"
-        step="0.01"
-      ></input>
-      {renderAudioTracks()}
+      <MasterController sources={audioSources} />
     </>
   )
 }
 
 export default StemPlayer
+
+export interface MasterControllerProps {
+  sources: string[]
+}
+
+const MasterController = (props: MasterControllerProps) => {
+  const { sources } = props
+  const [currentPlayers, setPlayers] = useState<any>([])
+
+  useEffect(() => {
+    const ply = createPlayers()
+    setPlayers(ply)
+  }, [])
+
+  const createPlayers = () => {
+    const players: { channel: Tone.Channel; player: Tone.Player }[] = []
+    sources.forEach((source) => {
+      const obj = {
+        channel: new Tone.Channel(0, 0),
+        player: new Tone.Player(source),
+      }
+      obj.player.chain(obj.channel, Tone.Destination)
+      players.push(obj)
+    })
+    return players
+  }
+
+  const toneStart = async () => {
+    await Tone.start()
+    console.log("audio is ready")
+  }
+  const startHandler = async () => {
+    toneStart()
+    Tone.loaded().then(() => {
+      currentPlayers.forEach((player: { player: { start: () => void } }) => {
+        player.player.start()
+      })
+    })
+  }
+  const stopHandler = () => {
+    currentPlayers.forEach((player: { player: { stop: () => void } }) => {
+      player.player.stop()
+    })
+  }
+  return (
+    <>
+      <button onClick={startHandler}>Start!!!</button>
+      <button onClick={stopHandler}>Stop!!!!</button>
+      {currentPlayers.map((player: {}, idx: number) => (
+        //@ts-ignore
+        <ChannelStrip key={idx} player={player} />
+      ))}
+    </>
+  )
+}
+
+export interface ChannelStripProps {
+  player: {
+    channel: any
+    player: any
+  }
+}
+
+const ChannelStrip = (props: ChannelStripProps) => {
+  const { player } = props
+  const [muted, setMuted] = useState(false)
+  const [volume, setVolume] = useState(0)
+
+  const muteHandler = () => {
+    player.channel.mute = !muted
+    setMuted(!muted)
+  }
+
+  const soloHandler = () => {
+    player.channel.solo = true
+  }
+
+  const volumeHandler = (e: any) => {
+    player.channel.volume.value = e.target.value
+    setVolume(e.target.value)
+  }
+
+  const panHandler = (e: any) => [(player.channel.pan.value = e.target.value)]
+
+  return (
+    <div style={{ border: "solid", borderColor: muted ? "red" : "green" }}>
+      <button onClick={muteHandler}>Mute</button>
+      <button onClick={soloHandler}>Solo</button>
+      <label>Volume</label>
+      <input
+        onChange={volumeHandler}
+        type="range"
+        id="volume"
+        min="-36"
+        max="0"
+        step="0.1"
+      ></input>
+      <label>Pan</label>
+      <input
+        onChange={panHandler}
+        type="range"
+        id="pan"
+        min="-1"
+        max="1"
+        defaultValue="0"
+        step=".1"
+      ></input>
+    </div>
+  )
+}
